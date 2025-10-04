@@ -25,7 +25,7 @@ class TrendRequest(BaseModel):
 
 
 class TrendsResponse(BaseModel):
-    trends: List[Trend]
+    summary: str
     debug: Optional[Dict[str, Any]] = None
 
 

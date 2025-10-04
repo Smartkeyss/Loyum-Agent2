@@ -10,6 +10,7 @@ from app.backend.schemas import Idea, Post, Trend
 class SessionState:
     platform: Optional[str] = None
     trends: Optional[List[Trend]] = None
+    trend_summary: Optional[str] = None
     selected_trend: Optional[Trend] = None
     ideas: Optional[List[Idea]] = None
     selected_idea: Optional[Idea] = None

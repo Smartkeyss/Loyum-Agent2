@@ -6,7 +6,17 @@ from typing import Dict, List, Tuple
 import httpx
 import streamlit as st
 
-from app.backend.schemas import Idea, IdeasRequest, IdeasResponse, Post, PostsRequest, PostsResponse, Trend, TrendRequest, TrendsResponse
+from app.backend.schemas import (
+    Idea,
+    IdeasRequest,
+    IdeasResponse,
+    Post,
+    PostsRequest,
+    PostsResponse,
+    Trend,
+    TrendRequest,
+    TrendsResponse,
+)
 from app.frontend import components
 from app.frontend.state import SessionState
 import sys, pathlib
@@ -32,18 +42,21 @@ def reset_for_platform(state: SessionState, platform: str) -> None:
     state.selected_trend = None
     state.selected_idea = None
     state.posts = None
-    cache = get_cache().setdefault(platform, {"trends": None, "ideas": {}, "posts": {}})
-    if cache.get("trends"):
-        state.trends = cache["trends"]  # type: ignore[assignment]
-    else:
-        state.trends = None
+    cache = get_cache().setdefault(
+        platform, {"summary": None, "ideas": {}, "posts": {}, "trends_debug": {}}
+    )
+    state.trends = None
+    cached_summary = cache.get("summary")
+    state.trend_summary = cached_summary if isinstance(cached_summary, str) else None
     state.ideas = None
 
 
 def fetch_trends(state: SessionState, platform: str, force: bool = False) -> None:
-    cache = get_cache().setdefault(platform, {"trends": None, "ideas": {}, "posts": {}})
-    if not force and cache.get("trends"):
-        state.trends = cache["trends"]  # type: ignore[assignment]
+    cache = get_cache().setdefault(
+        platform, {"summary": None, "ideas": {}, "posts": {}, "trends_debug": {}}
+    )
+    if not force and isinstance(cache.get("summary"), str):
+        state.trend_summary = cache["summary"]  # type: ignore[assignment]
         state.last_trends_debug = cache.get("trends_debug", {})  # type: ignore[assignment]
         return
 
@@ -60,15 +73,13 @@ def fetch_trends(state: SessionState, platform: str, force: bool = False) -> Non
 
     payload = response.json()
     data = TrendsResponse.model_validate(payload)
-    state.trends = data.trends
+    state.trends = None
+    state.trend_summary = data.summary
     state.last_trends_debug = data.debug or {}
-    cache["trends"] = data.trends
+    cache["summary"] = data.summary
     cache["trends_debug"] = state.last_trends_debug
     cache["ideas"] = cache.get("ideas", {})
     cache["posts"] = cache.get("posts", {})
-    if not data.trends:
-        st.info("No trends returned—try again.")
-
 
 def generate_ideas(state: SessionState, platform: str, trend: Trend, force: bool = False) -> None:
     cache = get_cache().setdefault(platform, {"trends": None, "ideas": {}, "posts": {}})
@@ -146,54 +157,13 @@ def main() -> None:
     elif regenerate_clicked:
         fetch_trends(state, normalized_platform, force=True)
 
-    if state.trends is None:
+    if state.trend_summary is None:
         st.info("Choose a platform and fetch trends to begin.")
         return
 
-    if state.selected_trend and state.selected_idea and state.posts:
-        st.header("Generated Posts")
-        components.render_post_cards(state.posts)
-        cols = st.columns(3)
-        if cols[0].button("Back to Ideas"):
-            state.posts = None
-        if cols[1].button("Regenerate Posts"):
-            generate_posts(state, normalized_platform, state.selected_idea, force=True)
-        if cols[2].button("Back to Trends"):
-            state.selected_idea = None
-            state.ideas = None
-            state.posts = None
-        if state.debug_enabled and state.last_posts_debug:
-            components.render_debug_payload("Last OpenAI posts prompt", state.last_posts_debug)
-        return
-
-    if state.selected_trend:
-        if state.ideas is None:
-            generate_ideas(state, normalized_platform, state.selected_trend)
-        st.header("Ideas")
-        components.render_idea_cards(state.ideas or [], lambda idea: select_idea(state, normalized_platform, idea))
-        cols = st.columns(3)
-        if cols[0].button("Back to Trends"):
-            state.selected_trend = None
-            state.ideas = None
-            state.selected_idea = None
-            state.posts = None
-        if cols[1].button("Regenerate Ideas"):
-            generate_ideas(state, normalized_platform, state.selected_trend, force=True)
-        if state.debug_enabled and state.last_ideas_debug:
-            components.render_debug_payload("Last OpenAI ideas prompt", state.last_ideas_debug)
-        if state.selected_idea and state.posts:
-            components.render_post_cards(state.posts)
-        return
-
     st.header("Top Trends")
-
-    def on_select(trend: Trend) -> None:
-        state.selected_trend = trend
-        state.selected_idea = None
-        state.posts = None
-        generate_ideas(state, normalized_platform, trend)
-
-    components.render_trend_cards(state.trends, on_select)
+    st.subheader(f"Top 10 {platform} Trends (Summary)")
+    st.markdown(state.trend_summary)
 
     if state.debug_enabled and state.last_trends_debug:
         components.render_debug_payload("Last Apify payload", state.last_trends_debug)

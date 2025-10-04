@@ -52,12 +52,13 @@ def fetch_trends(request: TrendRequest) -> TrendsResponse:
     platform = _normalize_platform(request.platform)
     normalized_request = TrendRequest(platform=platform, limit=request.limit)
     try:
-        trends, raw_items = trend_service.fetch_trends(platform, limit=normalized_request.limit)
+        summary, debug_payload = trend_service.fetch_trends(
+            platform, limit=normalized_request.limit
+        )
     except ApifyError as exc:
         logger.exception("Trend fetch failed for %s", platform)
         raise HTTPException(status_code=502, detail=str(exc))
-    debug: Dict[str, object] = {"raw_payload": raw_items}
-    return TrendsResponse(trends=trends, debug=debug)
+    return TrendsResponse(summary=summary, debug=debug_payload)
 
 
 @app.post("/ideas/generate", response_model=IdeasResponse)
