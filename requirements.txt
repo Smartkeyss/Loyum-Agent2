@@ -1,0 +1,11 @@
+python-dotenv
+pydantic
+pydantic-settings
+fastapi
+uvicorn
+httpx
+streamlit
+openai>=1.0.0
+tenacity
+orjson
+pytest
